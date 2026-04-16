@@ -36,16 +36,16 @@ Kemal Akkoyun · OpenTelemetry Maintainer · Datadog
 **The Collector** decouples instrumentation from destination.
 
 ```
-  ┌─────────────┐
-  │ App + SDK   │──┐
-  └─────────────┘  │    ┌──────────────┐
-                   ├──▶│  Collector   │
-  ┌─────────────┐  │    └──┬──┬──┬────┘
-  │ App + SDK   │──┘       │  │  │
-  └─────────────┘          ▼  ▼  ▼
-                   ┌───┐┌───┐┌────────┐
-                   │ A ││ B ││ Vendor │
-                   └───┘└───┘└────────┘
+  +-------------+
+  | App + SDK   |--+
+  +-------------+  |    +--------------+
+                   +--->|  Collector   |
+  +-------------+  |    +--+--+--+-----+
+  | App + SDK   |--+       |  |  |
+  +-------------+          v  v  v
+                   +---++---++--------+
+                   | A || B || Vendor |
+                   +---++---++--------+
 ```
 
 One binary: **receives**, **processes**, **exports** telemetry data
@@ -74,15 +74,15 @@ The Collector handles all OpenTelemetry signal types:
 Runs **locally** — as a sidecar or DaemonSet
 
 ```
-┌────────────────────────┐
-│  Node / Pod            │
-│  ┌─────┐  ┌─────────┐ │
-│  │ App │─▶│  Agent   │─┼──▶ Backend
-│  └─────┘  └─────────┘ │
-│  ┌─────┐       ▲      │
-│  │ App │───────┘      │
-│  └─────┘              │
-└────────────────────────┘
++------------------------+
+|  Node / Pod            |
+|  +-----+  +---------+ |
+|  | App |--> Agent    |---->  Backend
+|  +-----+  +---------+ |
+|  +-----+       ^      |
+|  | App |--------+      |
+|  +-----+              |
++------------------------+
 ```
 
 Low latency, local enrichment, buffer & retry
@@ -94,11 +94,11 @@ Low latency, local enrichment, buffer & retry
 Runs **centrally** — load-balanced service
 
 ```
-  Agent 1 ──┐
-             ├──▶ ┌─────────┐ ──▶ Backend A
-  Agent 2 ──┤    │ Gateway │
-             ├──▶ └─────────┘ ──▶ Backend B
-  Agent 3 ──┘
+  Agent 1 --+
+            +--> +---------+ ---> Backend A
+  Agent 2 --+    | Gateway |
+            +--> +---------+ ---> Backend B
+  Agent 3 --+
 ```
 
 Cross-cutting processing: tail sampling, routing, aggregation
@@ -219,9 +219,9 @@ service:
 # Inside a Pipeline: The DAG
 
 ```
-  Receiver 1 ─┐                                       ┌── Exporter 1
-  Receiver 2 ─┼──▶ Processor 1 ──▶ Processor N ──▶ fan-out ──┼── Exporter 2
-  Receiver N ─┘                                       └── Exporter N
+  Receiver 1 --+                                         +-- Exporter 1
+  Receiver 2 --+--> Processor 1 --> Processor N --> fan-out --+-- Exporter 2
+  Receiver N --+                                         +-- Exporter N
 ```
 
 Internally built as a **Directed Acyclic Graph** using [`gonum`](https://pkg.go.dev/gonum.org/v1/gonum/graph)
@@ -240,9 +240,8 @@ Internally built as a **Directed Acyclic Graph** using [`gonum`](https://pkg.go.
 # Connectors: Bridging Pipelines
 
 ```
-  ┌─ Traces Pipeline ──────────────────────┐    ┌─ Metrics Pipeline ──────────────────┐
-  │ otlp receiver → batch → spanmetrics ───┼───▶│ spanmetrics → filter → prometheus  │
-  └────────────────────────────────────────┘    └─────────────────────────────────────┘
+  [Traces Pipeline]                          [Metrics Pipeline]
+  otlp --> batch --> spanmetrics --------->  spanmetrics --> filter --> prometheus
 ```
 
 - Acts as **Exporter** from one pipeline and **Receiver** into another
@@ -536,11 +535,11 @@ func components() (otelcol.Factories, error) {
 # The Builder (OCB)
 
 ```
-  manifest.yaml ──▶ OCB ──▶ go build ──▶ Binary
-                     │
-                     ├── main.go        (generated)
-                     ├── components.go  (generated)
-                     └── go.mod         (generated)
+  manifest.yaml ---> OCB ---> go build ---> Binary
+                      |
+                      +-- main.go        (generated)
+                      +-- components.go  (generated)
+                      +-- go.mod         (generated)
 ```
 
 **Install:** `go install go.opentelemetry.io/collector/cmd/builder@latest`
@@ -626,21 +625,21 @@ exporters:
 # Repository Map
 
 ```
-opentelemetry-collector (core)        ← Stable v1.56.0 / Beta v0.150.0
-├── component/          # interfaces
-├── receiver/ processor/ exporter/ connector/
-├── service/internal/graph/   # DAG construction
-├── pdata/              # protocol data model
-├── confmap/            # config system
-├── cmd/builder/        # OCB tool
-└── versions.yaml
+opentelemetry-collector (core)         Stable v1.56.0 / Beta v0.150.0
+  +-- component/           # interfaces
+  +-- receiver/ processor/ exporter/ connector/
+  +-- service/internal/graph/    # DAG construction
+  +-- pdata/               # protocol data model
+  +-- confmap/             # config system
+  +-- cmd/builder/         # OCB tool
+  +-- versions.yaml
 
-opentelemetry-collector-contrib       ← 224+ components
-├── receiver/ (109) · processor/ (31) · exporter/ (43)
-└── connector/ (14) · extension/ (27)
+opentelemetry-collector-contrib        224+ components
+  +-- receiver/ (109)  processor/ (31)  exporter/ (43)
+  +-- connector/ (14)  extension/ (27)
 
-opentelemetry-collector-releases      ← 5 distributions
-└── distributions/ → manifest.yaml → OCB → goreleaser
+opentelemetry-collector-releases       5 distributions
+  +-- distributions/ --> manifest.yaml --> OCB --> goreleaser
 ```
 
 <span class="small">
